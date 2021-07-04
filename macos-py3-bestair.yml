@@ -1,0 +1,38 @@
+name: bestair
+channels:
+#  - anaconda
+  - conda-forge
+#  - defaults
+dependencies:
+  - bottleneck
+  - colour
+  - dash
+  - dask
+  - decorator
+  - gdal
+  - geopandas
+  - ipython
+  - jinja2
+  - matplotlib
+  - nbformat>=4.2.0
+  - netCDF4
+  - networkx
+  - numba
+  - numpy
+  - pandas
+  - pint
+  - pint-pandas
+  - pip
+  - plotly
+  - pydot
+  - pyparsing
+  - pytest
+  - python=3.8
+  - setuptools
+  - sphinx
+  - sphinx-argparse
+  - sphinx_rtd_theme
+  - sphinxcontrib-serializinghtml
+  - traitlets
+  - urllib3
+  - xarray
