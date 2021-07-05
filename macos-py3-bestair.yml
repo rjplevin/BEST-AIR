@@ -9,6 +9,7 @@ dependencies:
   - dash
   - dask
   - decorator
+  - flask-caching>=1.10
   - gdal
   - geopandas
   - ipython
@@ -35,4 +36,5 @@ dependencies:
   - sphinxcontrib-serializinghtml
   - traitlets
   - urllib3
+  - werkzeug
   - xarray

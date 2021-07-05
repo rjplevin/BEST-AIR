@@ -1,5 +1,6 @@
 colour
 dash
+flask-caching
 gdal
 numpy
 pandas
@@ -9,14 +10,15 @@ pytest
 scipy
 pytest-cov
 codecov
-future==0.18.2
+future
 geopandas
-ipython==7.22.0
-matplotlib==3.4.2
+ipython
+matplotlib
 numba
-#pydot==1.4.1
 plotly
-python-dateutil==2.8.1
-sphinx-argparse==0.2.5
-sphinx-rtd-theme==0.4.2
+python-dateutil
+# sphinx-argparse
+# sphinx-rtd-theme
+# wekzeug is included (but in in requirements) for flask-caching's filesystem cache
+werkzeug
 xarray
