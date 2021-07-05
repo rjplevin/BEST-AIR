@@ -11,11 +11,19 @@ from flask_caching import Cache
 
 class GeoData:
 
-    def __init__(self, shapefile_path, index_col=None):
-        self.gdf = gpd.read_file(shapefile_path)
+    def __init__(self, pathname, index_col=None):
+        """
+        Create a GeoData instance.
+
+        :param pathname: (str) pathname of a .shp or .geojson file.
+        :param index_col: (str or None) column name to set as index
+        """
+        self.gdf = gpd.read_file(pathname)
         self.index_col = index_col
         if index_col is not None:
             self.gdf.set_index(index_col, inplace=True)
+
+projection = 'mercator'
 
 data_dir = '/Volumes/Plevin1TB/BEST-AIR/data/'
 
@@ -23,14 +31,24 @@ data_dict = {
     # 9129 rows, 13 cols: 'STATEFP', 'COUNTYFP', 'TRACTCE', 'GEOID', 'NAME', 'NAMELSAD', 'MTFCC', 'FUNCSTAT', 'ALAND', 'AWATER', 'INTPTLAT', 'INTPTLON', 'geometry'
     'Census Tract' : GeoData(data_dir + 'CA-census-tracts/tl_2020_06_tract/tl_2020_06_tract.shp', 'GEOID'),
     'County'       : GeoData(data_dir + 'California_Counties/geo_export_9a3f5450-65c6-4f9a-93fc-bc6807b18507.shp', 'name'),
-    'Power Plant'  : GeoData(data_dir + 'power-plants/California_Power_Plants/Power_Plants.shp')
+    # 'Power Plant'  : GeoData(data_dir + 'power-plants/California_Power_Plants/Power_Plants.shp'),
+    # The geojson version is in lat/lon; the shapefile uses some other coordinate system
+    'Power Plant': GeoData(data_dir + 'power-plants/California_Power_Plants.geojson')
 }
 
 # trim down the power plant data to the useful set (still 1766 rows...)
 pp = data_dict['Power Plant']
-pp_gdf = pp.gdf[['Plant_ID', 'PlantName', 'State', 'County', 'Capacity_L', 'geometry']].copy()
-pp_gdf['Capacity_L'].fillna(0, inplace=True)
-pp_gdf = pp_gdf.query("Capacity_L > 0 and State == 'CA'") # TBD: decide whether to show neighboring states
+pp_gdf = pp.gdf[['Plant_ID', 'PlantName', 'State', 'County', 'Capacity_Latest', 'geometry']].copy()
+pp_gdf['Capacity_Latest'].fillna(0, inplace=True)
+pp_gdf = pp_gdf.query("Capacity_Latest > 0 and State == 'CA'") # TBD: decide whether to show neighboring states
+
+pp_scatter = go.Scattergeo(lat=pp_gdf.geometry.y,
+                           lon=pp_gdf.geometry.x,
+                           # projection=projection,
+                           # size='Capacity_Latest',
+                           mode='markers',
+                           hovertext=pp_gdf.PlantName,
+                           )
 
 app = dash.Dash(__name__)
 
@@ -80,14 +98,12 @@ def set_radio_buttons(resolution):
 
 @app.callback(
     Output("map", "figure"),
-    Input("column_choices", "value"),
-    Input("resolution_choices", "value"),
-
-    # For some reason, adding this results in a tiny map being drawn
-    # Input("show_power_plants", "value")
+    [Input("column_choices", "value"),
+     Input("resolution_choices", "value"),
+     Input("show_power_plants", "value")]
 )
 @cache.memoize(timeout=CACHE_TIMEOUT)
-def show_map(colname, resolution): #, power_plants):
+def show_map(colname, resolution, power_plants):
     gdf = data_dict[resolution].gdf
 
     fig = px.choropleth(
@@ -95,15 +111,11 @@ def show_map(colname, resolution): #, power_plants):
         geojson=gdf.geometry,
         locations=gdf.index,
         color=colname,
-        projection="mercator"
+        projection=projection
     )
 
-    #if power_plants:
-    fig.add_trace(go.Scattergeo(pp_gdf,
-                                lat=pp_gdf.geometry.y,
-                                lon=pp_gdf.geometry.x,
-                                # hover_name="PlantName"
-                                ))
+    if power_plants == 'Yes':
+        fig.add_trace(pp_scatter)
 
     fig.update_geos(fitbounds="locations", visible=False)
     fig.update_layout(margin={"r": 0, "t": 0, "l": 0, "b": 0})
