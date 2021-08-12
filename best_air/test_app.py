@@ -7,6 +7,8 @@ import geopandas as gpd
 import plotly.express as px
 import plotly.graph_objects as go
 from flask_caching import Cache
+from best_air.model import Model
+from best_air.version import VERSION
 
 class GeoData:
 
@@ -43,8 +45,8 @@ pp = data_dict['Power Plant']
 pp_gdf = pp.gdf[['Plant_ID', 'PlantName', 'State', 'County', 'Capacity_Latest', 'PriEnergySource', 'geometry']].copy()
 pp_gdf['Capacity_Latest'].fillna(0, inplace=True)
 
-# Non-polluting-fuel energy sources
-non_polluting = (
+# Non-combustion energy sources
+non_combustion = (
     'BAT',  # battery
     'GEO',  # geothermal
     'NUC',  # nuclear
@@ -54,7 +56,7 @@ non_polluting = (
 )
 
 # TBD: decide whether to show neighboring states
-pp_gdf = pp_gdf.query("Capacity_Latest > 0 and State == 'CA' and PriEnergySource not in @non_polluting")
+pp_gdf = pp_gdf.query("Capacity_Latest > 0 and State == 'CA' and PriEnergySource not in @non_combustion")
 
 fips_df = pd.read_csv(data_dir + 'CA-county-fips.csv', skiprows=1, index_col='name', dtype={'fips': str})
 countyfp = fips_df.fips.str[-3:] # the last 3 digits are the county code (string)
@@ -111,104 +113,111 @@ def get_pp_scatter(county=None):
                         )
     return trace
 
-app = dash.Dash(__name__)
+def main(args):
+    # TBD: use __name__ once this is not the main program
+    app = dash.Dash('app')
+    # app.config['suppress_callback_exceptions'] = True
+    app.title = "BEST-AIR v" + VERSION
 
-# How many seconds to allow the item to be cached. Default is 300 (5 min); we set it to an hour.
-# CACHE_TIMEOUT = 60 * 60
-CACHE_TIMEOUT = 10
+    model = Model()
 
-cache = Cache(app.server,
-              config={
-                  'CACHE_TYPE': 'FileSystemCache',
-                  'CACHE_DIR': '/Volumes/Plevin1TB/BEST-AIR/app-cache'
-              })
+    # How many seconds to allow the item to be cached. Default is 300 (5 min); we set it to an hour.
+    # CACHE_TIMEOUT = 60 * 60
+    CACHE_TIMEOUT = 10
 
-app.layout = html.Div([
-    html.H3("Example Choropleths"),
-    dcc.Dropdown(
-        id='county',
-        placeholder='Select county...',
-        options=county_items,
-        style={'width': '200px'}
-        #value=
-    ),
-    html.Div([
-        html.Span("Color counties by:"),
-        dcc.RadioItems(
-            id='county_stats_radio',
-            options=county_stats_items,
-            value='Population',
-            labelStyle={'display': 'inline'}),
-        ]),
-    html.Div([
-        html.Span("Show power plants:"),
-        dcc.RadioItems(
-            id='show_power_plants',
-            options=[{'value': x, 'label': x} for x in ('Yes', 'No')],
-            value='No',
-            labelStyle={'display': 'inline'}),
-        ]),
-    dcc.Graph(id="map", style={'height': '900px'}), # width is adjusted since ratio is fixed
-]) #, style={})
+    cache = Cache(app.server,
+                  config={
+                      'CACHE_TYPE': 'FileSystemCache',
+                      'CACHE_DIR': '/Volumes/Plevin1TB/BEST-AIR/app-cache'
+                  })
+
+    # noinspection PyCallingNonCallable
+    app.layout = html.Div([
+        html.H3("Example Choropleths"),
+        dcc.Dropdown(
+            id='county',
+            placeholder='Select county...',
+            options=county_items,
+            style={'width': '200px'}
+            #value=
+        ),
+        html.Div([
+            html.Span("Color counties by:"),
+            dcc.RadioItems(
+                id='county_stats_radio',
+                options=county_stats_items,
+                value='Population',
+                labelStyle={'display': 'inline'}),
+            ]),
+        html.Div([
+            html.Span("Show power plants:"),
+            dcc.RadioItems(
+                id='show_power_plants',
+                options=[{'value': x, 'label': x} for x in ('Yes', 'No')],
+                value='No',
+                labelStyle={'display': 'inline'}),
+            ]),
+        dcc.Graph(id="map", style={'height': '900px'}), # width is adjusted since ratio is fixed
+    ]) #, style={})
 
 
-@app.callback(
-    [Output("map", "figure"),
-     Output("county", "value")],
-    [Input("county", "value"),
-     Input("show_power_plants", "value"),
-     Input("county_stats_radio", "value"),
-     Input("map", "clickData"),
-     ],
-)
-@cache.memoize(timeout=CACHE_TIMEOUT)
-def show_map(county, power_plants, county_stat, click_data):
-    ctx = dash.callback_context
-
-    # clear clickData if not triggered in this call
-    triggered = ctx.triggered[0]
-    if triggered['prop_id'] != 'map.clickData':
-        click_data = None
-
-    if county is None and click_data is not None:
-        location = click_data['points'][0]['location']
-        # county map locations are numeric (strings) of GEOID
-        county = None if location.isdigit() else location
-
-    if county:
-        countyfp = countyfp_dict[county]
-        # show detail for the selected county
-        gdf = census_tract_gdf.query('COUNTYFP == @countyfp')
-        title = county + ' County'
-        color = 'POP2010'
-    else:
-        # show all counties
-        gdf = data_dict['County'].gdf
-        title = 'California'
-        color = county_stat
-
-    fig = px.choropleth(
-        gdf,
-        geojson=gdf.geometry,
-        locations=gdf.index,
-        color=color,
-        projection=projection,
-        title=title,
-        # clickmode='event+select',
+    @app.callback(
+        [Output("map", "figure"),
+         Output("county", "value")],
+        [Input("county", "value"),
+         Input("show_power_plants", "value"),
+         Input("county_stats_radio", "value"),
+         Input("map", "clickData"),
+         ],
     )
+    @cache.memoize(timeout=CACHE_TIMEOUT)
+    def show_map(county, power_plants, county_stat, click_data):
+        ctx = dash.callback_context
 
-    if power_plants == 'Yes':
-        # if county_name is None, adds all plants in the state
-        trace = get_pp_scatter(county)
-        fig.add_trace(trace)
+        # clear clickData if not triggered in this call
+        triggered = ctx.triggered[0]
+        if triggered['prop_id'] != 'map.clickData':
+            click_data = None
 
-    fig.update_geos(fitbounds="locations", visible=False)
-    fig.update_layout(margin={"r": 0, "t": 20, "l": 0, "b": 0},
-                      title={'text': title,
-                             'xanchor': 'center',
-                             'yanchor': 'top',
-                             'x': 0.5})
+        if county is None and click_data is not None:
+            location = click_data['points'][0]['location']
+            # county map locations are numeric (strings) of GEOID
+            county = None if (location and location.isdigit()) else location
 
-    return fig, county
+        if county:
+            countyfp = countyfp_dict[county]
+            # show detail for the selected county
+            gdf = census_tract_gdf.query('COUNTYFP == @countyfp')
+            title = county + ' County'
+            color = 'POP2010'
+        else:
+            # show all counties
+            gdf = data_dict['County'].gdf
+            title = 'California'
+            color = county_stat
 
-app.run_server(debug=True)
+        fig = px.choropleth(
+            gdf,
+            geojson=gdf.geometry,
+            locations=gdf.index,
+            color=color,
+            projection=projection,
+            title=title,
+            # clickmode='event+select',
+        )
+
+        if power_plants == 'Yes':
+            # if county_name is None, adds all plants in the state
+            trace = get_pp_scatter(county)
+            fig.add_trace(trace)
+
+        fig.update_geos(fitbounds="locations", visible=False)
+        fig.update_layout(margin={"r": 0, "t": 20, "l": 0, "b": 0},
+                          title={'text': title,
+                                 'xanchor': 'center',
+                                 'yanchor': 'top',
+                                 'x': 0.5})
+
+        return fig, county
+
+    app.run_server(debug=True)
