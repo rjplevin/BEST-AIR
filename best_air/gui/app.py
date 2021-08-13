@@ -100,7 +100,7 @@ def sector_selector_options(model, select_all=False):
     src_types = model.source_sector_types
     d = model.source_sectors_dict
 
-    options = [html.Optgroup([html.Option(name, value=name, selected=select_all) for name in sorted(d[src_type][category])], label=category)
+    options = [html.Optgroup([html.Option(name, value=name, selected=select_all) for name in sorted(d[src_type][category])], label=f"{src_type}: {category}")
                for src_type in src_types for category in sorted(d[src_type].keys())]
     return options
 
@@ -282,6 +282,13 @@ def settings_layout():
 def results_layout():
     return html.H2('RESULTS')
 
+def triggered_object_id(ctx):
+    if not ctx.triggered:
+        id = None
+    else:
+        id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    return id
 
 def main(args):
     model = Model()
@@ -341,12 +348,20 @@ def main(args):
         return value == 'state'
 
     @app.callback(
+        Output('resolution-selection-checklist', 'value'),
+        Input('resolution-radio', 'value'),
+    )
+    def uncheck_select_all_on_resolution_change(value):
+        return []
+
+    @app.callback(
         Output('resolution-selector', 'children'),
         Input('resolution-radio', 'value'),
         Input('resolution-selection-checklist', 'value')
     )
     def populate_resolution_selector(value, select_all_value):
-        select_all = 'select' in select_all_value
+        triggered = triggered_object_id(dash.callback_context)
+        select_all = (triggered == 'resolution-selection-checklist' and 'select' in select_all_value)
 
         if value == 'state':
             return {}
