@@ -1,4 +1,5 @@
-from .config import getParam, getParamAsFloat, getParamAsInt
+from collections import defaultdict
+from .config import getParamAsFloat, getParamAsInt
 from .core import BestAirObject
 from .table_manager import TableManager
 
@@ -32,8 +33,22 @@ class Model(BestAirObject):
         self.tac_names = sorted(self.TACs.index)
         self.cap_names = sorted(self.CAPs.index)
 
-        # TBD: create a CSV table
-        self.emission_sectors = [f"Sector-{n+1}" for n in range(50)]
+        df = tbl_mgr.get_table('counties')
+        self.counties = sorted(df['name'])
+
+        df = tbl_mgr.get_table('air-basins')
+        self.air_basins = sorted(df['name'])
+
+        df = tbl_mgr.get_table('air-districts')
+        self.air_districts = sorted(df['name'])
+
+        df = tbl_mgr.get_table('source-sectors')
+        self.source_sectors = [f"{row.category}-{row.subcategory}" for idx, row in df.iterrows()]
+        self.source_sector_types = sorted(df.source_type.unique())
+
+        self.source_sectors_dict = d = defaultdict(lambda: defaultdict(list))
+        for idx, row in df.iterrows():
+            d[row.source_type][row.category].append(row.subcategory)
 
         self.first_year = getParamAsInt('BEST_AIR.StartYear')
         self.last_year  = getParamAsInt('BEST_AIR.EndYear')

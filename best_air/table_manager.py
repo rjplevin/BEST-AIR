@@ -32,7 +32,11 @@ class TableManager(BestAirObject):
     table_defs = [
         TableDef('CAP', index_col='name'),
         TableDef('TAC', index_col='name'),
-        # TableDef('GWP', index_col=False),
+        TableDef('counties', index_col=False),
+        TableDef('air-basins', index_col=False),
+        TableDef('air-districts', index_col=False),
+        TableDef('source-sectors', index_col=False),
+
         # TableDef('bitumen-mining-energy-intensity', index_col=0),
         # TableDef('transport-specific-EF', index_col=('Mode', 'Fuel'),
     ]
