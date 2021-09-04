@@ -27,9 +27,9 @@ for basename in basenames:
     data[basename] = pd.concat(df_parts, axis='rows')
 
 for name, df in data.items():
-    print(f"{name}:")
-    print(f"  cols: {df.columns}")
-    print(f"  shape: {df.shape}")
+    path = f"{datadir}combined/{name}.csv.gz"
+    print(f"Writing {path}, shape: {df.shape}")
+    df.to_csv(path, index=None)
 
 # Example run:
 #
