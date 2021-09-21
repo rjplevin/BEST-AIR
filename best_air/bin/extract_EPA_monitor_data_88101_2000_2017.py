@@ -70,6 +70,9 @@ def extract(input_path, output_path):
 
     verify_excludes_have_matching_includes(df)
 
+    rows_to_keep = (df['Event Type'] != 'Excluded')
+    df = df[rows_to_keep]
+
     print(f"Saving extracted data {df.shape} to '{output_path}'")
     df.to_csv(output_path, index=None, quoting=csv.QUOTE_NONNUMERIC)
 
